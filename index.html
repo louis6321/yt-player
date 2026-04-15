@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0a0a0b" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="darkreader-lock" />
+  <title>YouTube Player URL Generator</title>
+  <style>
+    html { color-scheme: dark; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+      min-height: 100vh;
+      background: #0a0a0b;
+      color: #c8c8c8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card {
+      width: min(560px, 92vw);
+      padding: 32px;
+    }
+
+    h1 {
+      font-size: 15px;
+      font-weight: 500;
+      color: #e0e0e0;
+      margin-bottom: 24px;
+      letter-spacing: 0.02em;
+    }
+
+    label {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #666;
+      margin-bottom: 6px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      font-family: inherit;
+      font-size: 13px;
+      padding: 10px 12px;
+      background: #111113;
+      color: #d4d4d4;
+      border: 1px solid #222;
+      border-radius: 4px;
+      outline: none;
+    }
+    input[type="text"]:focus {
+      border-color: #444;
+    }
+
+    .options {
+      display: flex;
+      gap: 20px;
+      margin: 16px 0 20px;
+    }
+    .options label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      text-transform: none;
+      letter-spacing: normal;
+      color: #999;
+      cursor: pointer;
+      margin-bottom: 0;
+    }
+    .options input[type="checkbox"] {
+      accent-color: #555;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: 13px;
+      padding: 9px 20px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      background: #151517;
+      color: #ccc;
+      cursor: pointer;
+    }
+    button:hover { background: #1c1c1f; border-color: #444; }
+    button:active { background: #111113; }
+    button:disabled { opacity: 0.35; cursor: default; }
+    button:disabled:hover { background: #151517; border-color: #333; }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .output-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #666;
+      margin: 24px 0 6px;
+    }
+
+    .output-row {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+    .output-box {
+      flex: 1;
+      font-family: inherit;
+      font-size: 12px;
+      line-height: 1.5;
+      padding: 10px 12px;
+      background: #111113;
+      color: #888;
+      border: 1px solid #1a1a1a;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      min-height: 40px;
+    }
+    .output-box.has-url { color: #d4d4d4; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>YouTube Playlist Player</h1>
+
+    <label for="url">Playlist URL</label>
+    <input type="text" id="url" placeholder="https://www.youtube.com/playlist?list=PL..." spellcheck="false" />
+
+    <div class="options">
+      <label><input type="checkbox" id="loop" checked /> Loop</label>
+      <label><input type="checkbox" id="kumaToggle" /> Uptime Kuma Heartbeat</label>
+    </div>
+
+    <div id="kumaField" style="display:none; margin-bottom:4px;">
+      <label for="heartbeat">Heartbeat URL</label>
+      <input type="text" id="heartbeat" placeholder="https://kuma.example.com/api/push/..." spellcheck="false" />
+    </div>
+
+    <div class="actions">
+      <button id="gen">Generate</button>
+      <button id="copy" disabled>Copy</button>
+    </div>
+
+    <div class="output-label">Player URL</div>
+    <div class="output-row">
+      <div class="output-box" id="out">Paste a playlist URL above</div>
+    </div>
+  </div>
+
+<script>
+  function getPlaylistId(raw) {
+    try {
+      const u = new URL(raw.trim());
+      const list = u.searchParams.get("list");
+      return list && list.length > 5 ? list : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function buildPlayerUrl(playlistId) {
+    const params = new URLSearchParams();
+    params.set("list", playlistId);
+    params.set("loop", document.getElementById("loop").checked ? "1" : "0");
+    if (document.getElementById("kumaToggle").checked) {
+      const hb = document.getElementById("heartbeat").value.trim();
+      if (hb) params.set("heartbeat", hb);
+    }
+    const base = new URL("player.html", window.location.href);
+    base.search = params.toString();
+    return base.toString();
+  }
+
+  document.getElementById("kumaToggle").addEventListener("change", (e) => {
+    document.getElementById("kumaField").style.display = e.target.checked ? "" : "none";
+  });
+
+  const out = document.getElementById("out");
+  const copyBtn = document.getElementById("copy");
+
+  document.getElementById("gen").addEventListener("click", () => {
+    const playlistId = getPlaylistId(document.getElementById("url").value);
+    if (!playlistId) {
+      out.textContent = "Invalid URL — must contain ?list=...";
+      out.classList.remove("has-url");
+      copyBtn.disabled = true;
+      return;
+    }
+    const url = buildPlayerUrl(playlistId);
+    out.textContent = url;
+    out.classList.add("has-url");
+    copyBtn.disabled = false;
+  });
+
+  document.getElementById("url").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("gen").click();
+  });
+
+  copyBtn.addEventListener("click", async () => {
+    const text = out.textContent.trim();
+    await navigator.clipboard.writeText(text);
+    copyBtn.textContent = "Copied";
+    setTimeout(() => (copyBtn.textContent = "Copy"), 1200);
+  });
+</script>
+</body>
+</html>

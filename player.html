@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="darkreader-lock" />
+  <title>Playlist Player</title>
+  <style>
+    html { color-scheme: dark; }
+    html, body { margin:0; height:100%; background:#000; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    #wrap { position:relative; height:100%; width:100%; }
+    #player { position:absolute; inset:0; }
+    /* HUD removed */
+    #title { font-size:14px; opacity:.95; }
+    #status { font-size:12px; opacity:.85; }
+    #barWrap { flex:1; min-width: 180px; height: 8px; background: rgba(255,255,255,.2); border-radius:999px; overflow:hidden; }
+    #bar { height:100%; width:0%; background: rgba(255,255,255,.85); }
+    .hidden { display:none !important; }
+    /* debug UI removed */
+  </style>
+</head>
+<body>
+<div id="wrap">
+  <div id="player"></div>
+</div>
+
+<script>
+/**
+ * Key idea:
+ * - Persist "where we are" in localStorage:
+ *   { idx, t, videoId, updatedAt }
+ * - Watchdog every 1s:
+ *   - if BUFFERING for >10s => reload same index+time
+ *   - if PLAYING but time not advancing for >10s => reload
+ * - On errors (101/150/etc) => skip next
+ *
+ * Player states from YT API:
+ *  -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering, 5 cued
+ * getPlayerState() is documented in IFrame API reference.  [oai_citation:1‡Google for Developers](https://developers.google.com/youtube/iframe_api_reference?utm_source=chatgpt.com)
+ */
+
+  function qs(name, def=null) {
+    const v = new URLSearchParams(location.search).get(name);
+    return v === null ? def : v;
+  }
+
+  const playlistId = qs("list");
+  if (!playlistId) {
+    document.body.innerHTML = "<div style='padding:20px;color:#fff'>Missing ?list=PLAYLIST_ID</div>";
+    throw new Error("Missing playlist id");
+  }
+
+  const opts = {
+    loop: qs("loop","1") === "1",
+    heartbeat: qs("heartbeat"),
+  };
+
+  const elTitle = document.getElementById("title");
+  const elStatus = document.getElementById("status");
+  const elBarWrap = document.getElementById("barWrap");
+  const elBar = document.getElementById("bar");
+
+  // title/progress options removed — HUD elements always visible
+
+  const STORAGE_KEY = `yt24x7:${playlistId}`;
+
+  function loadSaved() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const obj = JSON.parse(raw);
+      if (typeof obj?.idx !== "number" || typeof obj?.t !== "number") return null;
+      return obj;
+    } catch { return null; }
+  }
+
+  function saveState(state) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+  }
+
+  function nowMs() { return Date.now(); }
+
+  let player;
+  let lastTime = null;
+  let lastTimeAdvanceMs = nowMs();
+  let bufferingSinceMs = null;
+  let lastGoodSnapshotMs = 0;
+  let currentVideoId = null;
+  let manuallyPaused = false;
+  let previousPlayerState = -1;
+  let pausedAtMs = null;
+  let unstartedSinceMs = null;
+
+  function snapshot() {
+    if (!player || typeof player.getCurrentTime !== "function") return null;
+    const t = Number(player.getCurrentTime() || 0);
+    const idx = Number(player.getPlaylistIndex?.() ?? 0);
+    const vid = String(player.getVideoData?.().video_id || "");
+    return { idx, t, videoId: vid, updatedAt: nowMs() };
+  }
+
+  // debugLog removed — no on-screen debugging
+  function debugLog() {}
+  function setStatus(text) { if (elStatus) elStatus.textContent = text; }
+
+  function updateHud() {
+    if (!player) return;
+    const data = player.getVideoData?.();
+    const title = data?.title || "";
+    if (elTitle) elTitle.textContent = title;
+
+    if (typeof player.getDuration === "function") {
+      const d = Number(player.getDuration() || 0);
+      const t = Number(player.getCurrentTime() || 0);
+      const pct = d > 0 ? Math.max(0, Math.min(100, (t / d) * 100)) : 0;
+      if (elBar) elBar.style.width = pct.toFixed(3) + "%";
+    }
+  }
+
+  function safePlay() {
+    try { player.playVideo(); } catch {}
+  }
+
+  function sendHeartbeat() {
+    if (opts.heartbeat) {
+      try { fetch(opts.heartbeat, { mode: "no-cors" }).catch(() => {}); } catch (e) {}
+    }
+  }
+
+  function hardReload(reason) {
+    console.log('hard reload:', reason);
+    const snap = snapshot() || loadSaved() || { idx: 0, t: 0 };
+    saveState(snap);
+    location.reload();
+  }
+
+  function nextVideo(reason) {
+    manuallyPaused = false;
+    pausedAtMs = null;
+    setStatus(`Skipping… (${reason})`);
+    try { player.nextVideo(); } catch {}
+    setTimeout(safePlay, 500);
+  }
+
+
+  // YouTube IFrame API loader
+  const tag = document.createElement("script");
+  tag.src = "https://www.youtube.com/iframe_api";
+  document.head.appendChild(tag);
+
+  window.onYouTubeIframeAPIReady = () => {
+    const saved = loadSaved();
+    initPlayer(saved);
+  };
+
+  function initPlayer(saved) {
+    const startIdx = saved?.idx ?? 0;
+    const startT = saved?.t ?? 0;
+
+    player = new YT.Player("player", {
+      width: "100%",
+      height: "100%",
+      // When using playlists, you can omit videoId and rely on list/listType in playerVars.  [oai_citation:3‡Google for Developers](https://developers.google.com/youtube/iframe_api_reference?utm_source=chatgpt.com)
+      playerVars: {
+        listType: "playlist",
+        list: playlistId,
+
+        autoplay: 1,
+        controls: 1,
+        disablekb: 1,
+        fs: 0,
+        modestbranding: 1,
+        rel: 0,
+
+        // If loop=1, YouTube requires playlist param as well (we already set list)
+        loop: opts.loop ? 1 : 0,
+      },
+      events: {
+        onReady: (e) => {
+          setStatus("Ready");
+          // Jump to saved position on startup
+          if (startIdx || startT) {
+            try {
+              player.loadPlaylist({
+                listType: "playlist",
+                list: playlistId,
+                index: startIdx,
+                startSeconds: startT,
+              });
+            } catch (err) {
+              safePlay();
+            }
+          } else {
+            safePlay();
+          }
+        },
+        onPlaybackQualityChange: (q) => {
+          try { updateHud(); } catch (e) {}
+        },
+        onStateChange: (e) => {
+          const prevState = previousPlayerState;
+          previousPlayerState = e.data;
+
+          // Track buffering
+            if (e.data === YT.PlayerState.BUFFERING) {
+              bufferingSinceMs = bufferingSinceMs ?? nowMs();
+              setStatus("Buffering…");
+
+            } else {
+              bufferingSinceMs = null;
+            }
+
+          if (e.data === YT.PlayerState.PAUSED) {
+            pausedAtMs = nowMs();
+            // Only treat as manual pause if transitioning from active playback
+            if (prevState === YT.PlayerState.PLAYING) {
+              manuallyPaused = true;
+            }
+            setStatus("Paused");
+          }
+
+          if (e.data === YT.PlayerState.ENDED) {
+            setStatus("Ended");
+            // If loop is requested, jump to the first item and play it.
+            if (opts.loop) {
+              try {
+                if (typeof player.playVideoAt === 'function') {
+                  player.playVideoAt(0);
+                } else {
+                  player.loadPlaylist({ listType: 'playlist', list: playlistId, index: 0, startSeconds: 0 });
+                }
+                safePlay();
+              } catch (e) {}
+            }
+          }
+
+          if (e.data === YT.PlayerState.PLAYING) {
+            setStatus("Playing");
+            manuallyPaused = false;
+            pausedAtMs = null;
+            unstartedSinceMs = null;
+            sendHeartbeat();
+            safePlay();
+            // Reset watchdog timers when a new video starts to avoid false reloads
+            try {
+              const vid = String(player.getVideoData?.().video_id || "");
+              if (vid && vid !== currentVideoId) {
+                currentVideoId = vid;
+                lastTime = Number(player.getCurrentTime?.() || 0);
+                lastTimeAdvanceMs = nowMs();
+                bufferingSinceMs = null;
+              }
+            } catch (e) {}
+          }
+        },
+        onError: (e) => {
+          // Errors happen for embed-disabled videos etc.
+          // Common: 101/150 = not allowed to play in embedded players.  [oai_citation:4‡Google for Developers](https://developers.google.com/youtube/iframe_api_reference?utm_source=chatgpt.com)
+          setStatus(`Error ${e.data}`);
+          // Skip to next item after a short delay
+          setTimeout(() => nextVideo(`error ${e.data}`), 1200);
+        }
+      }
+    });
+  }
+
+  // Watchdog loop
+  setInterval(() => {
+    if (!player) return;
+
+    updateHud();
+
+    let state, t;
+    try {
+      state = player.getPlayerState?.();
+      t = Number(player.getCurrentTime?.() || 0);
+    } catch (e) {
+      // Player API is dead / iframe unresponsive
+      console.log('player API threw, hard reloading');
+      const snap = loadSaved() || { idx: 0, t: 0 };
+      saveState(snap);
+      location.reload();
+      return;
+    }
+    // If getPlayerState returned undefined/null, the API is broken
+    if (state == null) {
+      console.log('player state is null/undefined, hard reloading');
+      const snap = loadSaved() || { idx: 0, t: 0 };
+      saveState(snap);
+      location.reload();
+      return;
+    }
+
+    // Save progress every ~2s while playing/buffering/cued
+    const ms = nowMs();
+    if (ms - lastGoodSnapshotMs > 2000 && (state === 1 || state === 3 || state === 5)) {
+      const snap = snapshot();
+      if (snap) {
+        // Only save if time is non-trivial; avoids thrashing at 0
+        saveState(snap);
+        lastGoodSnapshotMs = ms;
+      }
+    }
+
+    // Track time advancement for "stuck while playing" detection
+    if (lastTime === null) {
+      lastTime = t;
+      lastTimeAdvanceMs = ms;
+    } else {
+      // If time advanced by >= 0.25s, consider it healthy
+      if (t > lastTime + 0.25) {
+        lastTime = t;
+        lastTimeAdvanceMs = ms;
+      }
+    }
+
+    // 1) Buffering spinner for >10s => reload at last known good time
+    if (state === 3) {
+      if (bufferingSinceMs && (ms - bufferingSinceMs) > 10_000) {
+        hardReload("buffering>10s");
+      }
+      return;
+    }
+
+    // 2) Playing but time not moving for >10s => reload
+    if (state === 1) {
+      if ((ms - lastTimeAdvanceMs) > 10_000) {
+        hardReload("stuck>10s");
+      }
+      return;
+    }
+
+    // 3) Paused-state recovery:
+    //    If NOT a manual pause (e.g. YouTube glitch / grey screen), reload after 10s.
+    //    If manual pause, allow 30s grace then attempt safePlay();
+    //    if that fails, next cycle (10s later) escalates to a full reload.
+    if (state === 2) {
+      if (!pausedAtMs) pausedAtMs = ms;
+      const idleMs = ms - pausedAtMs;
+      if (manuallyPaused && idleMs > 30_000) {
+        manuallyPaused = false;
+        safePlay();
+        pausedAtMs = ms;
+      } else if (!manuallyPaused && idleMs > 10_000) {
+        hardReload("paused-glitch>10s");
+      }
+      return;
+    }
+
+    // General fallback: if time hasn't advanced for >10s,
+    // attempt a reload. This catches cases where onStateChange didn't report
+    // BUFFERING/PLAYING but playback is stuck (e.g. offline spinner).
+    if ((ms - lastTimeAdvanceMs) > 10_000) {
+      hardReload("no-progress>10s");
+      return;
+    }
+
+    // If unstarted for a brief period, try safePlay. If stuck >15s, escalate to reload.
+    if (state === -1) {
+      if (!unstartedSinceMs) unstartedSinceMs = ms;
+      const unstartedMs = ms - unstartedSinceMs;
+      if (unstartedMs > 15_000) {
+        hardReload("unstarted>15s");
+      } else {
+        setStatus("Resuming…");
+        safePlay();
+      }
+    } else {
+      unstartedSinceMs = null;
+    }
+  }, 1000);
+  // Uptime Kuma heartbeat: ping every 60s while playing
+  if (opts.heartbeat) {
+    setInterval(() => {
+      try {
+        if (!player) return;
+        const state = player.getPlayerState?.();
+        if (state === YT.PlayerState.PLAYING) {
+          fetch(opts.heartbeat, { mode: "no-cors" }).catch(() => {});
+        }
+      } catch (e) {}
+    }, 60_000);
+  }</script>
+</body>
+</html>
