@@ -136,6 +136,7 @@
 
     <div class="options">
       <label><input type="checkbox" id="loop" checked /> Loop</label>
+      <label><input type="checkbox" id="shuffle" /> Shuffle on loop</label>
       <label><input type="checkbox" id="kumaToggle" /> Uptime Kuma Heartbeat</label>
     </div>
 
@@ -170,6 +171,7 @@
     const params = new URLSearchParams();
     params.set("list", playlistId);
     params.set("loop", document.getElementById("loop").checked ? "1" : "0");
+    if (document.getElementById("shuffle").checked) params.set("shuffle", "1");
     if (document.getElementById("kumaToggle").checked) {
       const hb = document.getElementById("heartbeat").value.trim();
       if (hb) params.set("heartbeat", hb);

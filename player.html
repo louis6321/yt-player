@@ -54,6 +54,7 @@
 
   const opts = {
     loop: qs("loop","1") === "1",
+    shuffle: qs("shuffle","0") === "1",
     heartbeat: qs("heartbeat"),
   };
 
@@ -93,12 +94,49 @@
   let pausedAtMs = null;
   let unstartedSinceMs = null;
 
+  // Manual playlist management
+  let videoList = null;  // captured from player.getPlaylist() on first play
+  let videoIndex = 0;
+
   function snapshot() {
     if (!player || typeof player.getCurrentTime !== "function") return null;
     const t = Number(player.getCurrentTime() || 0);
-    const idx = Number(player.getPlaylistIndex?.() ?? 0);
+    const idx = videoList ? videoIndex : Number(player.getPlaylistIndex?.() ?? 0);
     const vid = String(player.getVideoData?.().video_id || "");
     return { idx, t, videoId: vid, updatedAt: nowMs() };
+  }
+
+  function capturePlaylist() {
+    if (videoList) return;
+    try {
+      const list = player.getPlaylist?.();
+      if (list && list.length > 0) {
+        videoList = list;
+        videoIndex = player.getPlaylistIndex?.() ?? 0;
+        console.log(`Captured playlist: ${videoList.length} videos, starting at index ${videoIndex}`);
+      }
+    } catch {}
+  }
+
+  function shuffleList() {
+    for (let i = videoList.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [videoList[i], videoList[j]] = [videoList[j], videoList[i]];
+    }
+  }
+
+  function playVideoAtIndex(idx) {
+    if (!videoList || videoList.length === 0) return;
+    videoIndex = ((idx % videoList.length) + videoList.length) % videoList.length;
+    manuallyPaused = false;
+    pausedAtMs = null;
+    lastTime = null;
+    lastTimeAdvanceMs = nowMs();
+    bufferingSinceMs = null;
+    unstartedSinceMs = null;
+    try {
+      player.loadVideoById(videoList[videoIndex]);
+    } catch {}
   }
 
   // debugLog removed — no on-screen debugging
@@ -140,8 +178,13 @@
     manuallyPaused = false;
     pausedAtMs = null;
     setStatus(`Skipping… (${reason})`);
-    try { player.nextVideo(); } catch {}
-    setTimeout(safePlay, 500);
+    if (videoList && videoList.length > 0) {
+      playVideoAtIndex(videoIndex + 1);
+    } else {
+      // Fallback before playlist is captured
+      try { player.nextVideo(); } catch {}
+      setTimeout(safePlay, 500);
+    }
   }
 
 
@@ -174,8 +217,8 @@
         modestbranding: 1,
         rel: 0,
 
-        // If loop=1, YouTube requires playlist param as well (we already set list)
-        loop: opts.loop ? 1 : 0,
+        // Looping is handled manually in onStateChange ENDED handler
+        loop: 0,
       },
       events: {
         onReady: (e) => {
@@ -223,16 +266,19 @@
 
           if (e.data === YT.PlayerState.ENDED) {
             setStatus("Ended");
-            // If loop is requested, jump to the first item and play it.
-            if (opts.loop) {
-              try {
-                if (typeof player.playVideoAt === 'function') {
-                  player.playVideoAt(0);
-                } else {
-                  player.loadPlaylist({ listType: 'playlist', list: playlistId, index: 0, startSeconds: 0 });
-                }
-                safePlay();
-              } catch (e) {}
+            if (videoList && videoList.length > 0) {
+              if (videoIndex < videoList.length - 1) {
+                // Advance to next video
+                playVideoAtIndex(videoIndex + 1);
+              } else if (opts.loop) {
+                // Last video — loop back to beginning
+                if (opts.shuffle) shuffleList();
+                playVideoAtIndex(0);
+              }
+            } else {
+              // Playlist not yet captured — fall back to reload
+              player.loadPlaylist({ listType: 'playlist', list: playlistId, index: 0, startSeconds: 0 });
+              safePlay();
             }
           }
 
@@ -242,7 +288,7 @@
             pausedAtMs = null;
             unstartedSinceMs = null;
             sendHeartbeat();
-            safePlay();
+            capturePlaylist();
             // Reset watchdog timers when a new video starts to avoid false reloads
             try {
               const vid = String(player.getVideoData?.().video_id || "");
