@@ -136,7 +136,7 @@
 
     <div class="options">
       <label><input type="checkbox" id="loop" checked /> Loop</label>
-      <label><input type="checkbox" id="shuffle" /> Shuffle on loop</label>
+      <label id="shuffleOption"><input type="checkbox" id="shuffle" /> Shuffle on loop</label>
       <label><input type="checkbox" id="kumaToggle" /> Uptime Kuma Heartbeat</label>
     </div>
 
@@ -180,6 +180,11 @@
     base.search = params.toString();
     return base.toString();
   }
+
+  document.getElementById("loop").addEventListener("change", (e) => {
+    document.getElementById("shuffleOption").style.display = e.target.checked ? "" : "none";
+    if (!e.target.checked) document.getElementById("shuffle").checked = false;
+  });
 
   document.getElementById("kumaToggle").addEventListener("change", (e) => {
     document.getElementById("kumaField").style.display = e.target.checked ? "" : "none";
