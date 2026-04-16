@@ -182,8 +182,12 @@
   }
 
   document.getElementById("loop").addEventListener("change", (e) => {
-    document.getElementById("shuffleOption").style.display = e.target.checked ? "" : "none";
-    if (!e.target.checked) document.getElementById("shuffle").checked = false;
+    const shuffleLabel = document.getElementById("shuffleOption");
+    const shuffleBox = document.getElementById("shuffle");
+    shuffleLabel.style.opacity = e.target.checked ? "" : "0.35";
+    shuffleLabel.style.pointerEvents = e.target.checked ? "" : "none";
+    if (!e.target.checked) shuffleBox.checked = false;
+    shuffleBox.disabled = !e.target.checked;
   });
 
   document.getElementById("kumaToggle").addEventListener("change", (e) => {
