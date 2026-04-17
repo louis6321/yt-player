@@ -174,16 +174,23 @@
   function heartbeatUrl() {
     if (!opts.heartbeat) return null;
     try {
-      const title = player?.getVideoData?.()?.title || "";
+      const data = player?.getVideoData?.();
+      const title = data?.title || "";
+      const vid = data?.video_id || "";
+      const msg = title ? (vid ? `${title} (${vid})` : title) : "Playing";
       const url = new URL(opts.heartbeat);
-      url.searchParams.set("msg", title || "Playing");
+      url.searchParams.set("msg", msg);
       return url.toString();
     } catch { return opts.heartbeat; }
   }
 
+  let lastHeartbeatMs = 0;
   function sendHeartbeat() {
+    const now = nowMs();
+    if (now - lastHeartbeatMs < 5000) return;
     const url = heartbeatUrl();
     if (url) {
+      lastHeartbeatMs = now;
       try { fetch(url, { mode: "no-cors" }).catch(() => {}); } catch (e) {}
     }
   }
