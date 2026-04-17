@@ -143,8 +143,10 @@
     bufferingSinceMs = null;
     unstartedSinceMs = null;
     try {
-      player.loadVideoById(videoList[videoIndex]);
+      player.loadVideoById({ videoId: videoList[videoIndex], startSeconds: 0 });
     } catch {}
+    // Immediately persist t=0 so a reload won't resume mid-video
+    saveState({ idx: videoIndex, t: 0, videoId: videoList[videoIndex], updatedAt: nowMs() });
   }
 
   // debugLog removed — no on-screen debugging
