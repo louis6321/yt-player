@@ -114,6 +114,14 @@
         videoList = list;
         videoIndex = player.getPlaylistIndex?.() ?? 0;
         console.log(`Captured playlist: ${videoList.length} videos, starting at index ${videoIndex}`);
+        // Exit YouTube's built-in playlist mode so our ENDED handler
+        // has sole control over advancement (prevents auto-advance race).
+        setTimeout(() => {
+          try {
+            const t = player.getCurrentTime?.() || 0;
+            player.loadVideoById({ videoId: videoList[videoIndex], startSeconds: t });
+          } catch {}
+        }, 0);
       }
     } catch {}
   }
