@@ -171,9 +171,20 @@
     try { player.playVideo(); } catch {}
   }
 
+  function heartbeatUrl() {
+    if (!opts.heartbeat) return null;
+    try {
+      const title = player?.getVideoData?.()?.title || "";
+      const url = new URL(opts.heartbeat);
+      url.searchParams.set("msg", title || "Playing");
+      return url.toString();
+    } catch { return opts.heartbeat; }
+  }
+
   function sendHeartbeat() {
-    if (opts.heartbeat) {
-      try { fetch(opts.heartbeat, { mode: "no-cors" }).catch(() => {}); } catch (e) {}
+    const url = heartbeatUrl();
+    if (url) {
+      try { fetch(url, { mode: "no-cors" }).catch(() => {}); } catch (e) {}
     }
   }
 
@@ -434,7 +445,7 @@
         if (!player) return;
         const state = player.getPlayerState?.();
         if (state === YT.PlayerState.PLAYING) {
-          fetch(opts.heartbeat, { mode: "no-cors" }).catch(() => {});
+          sendHeartbeat();
         }
       } catch (e) {}
     }, 60_000);
