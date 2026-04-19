@@ -20,7 +20,7 @@ A self-hosted, always-on YouTube playlist player designed for unattended 24/7 pl
 2. Paste a YouTube playlist URL
 3. Configure options (loop, shuffle, heartbeat)
 4. Click **Generate** to get a player URL
-5. Open the player URL in a browser — it will play continuously
+5. Open the player URL in a browser — it will play continuously (it is recommended to be logged into a YouTube account with an active YouTube Premium subsription, and ensure any browser protections for cross-site cookie usage are disabled on the page)
 
 ## How It Works
 
