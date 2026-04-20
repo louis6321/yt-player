@@ -157,6 +157,29 @@
   </div>
 
 <script>
+  function qs(name) {
+    return new URLSearchParams(window.location.search).get(name);
+  }
+
+  function parseBooleanParam(value, fallback) {
+    if (value === null) return fallback;
+
+    switch (value.trim().toLowerCase()) {
+      case "1":
+      case "true":
+      case "yes":
+      case "on":
+        return true;
+      case "0":
+      case "false":
+      case "no":
+      case "off":
+        return false;
+      default:
+        return fallback;
+    }
+  }
+
   function getPlaylistId(raw) {
     try {
       const u = new URL(raw.trim());
@@ -194,8 +217,31 @@
     document.getElementById("kumaField").style.display = e.target.checked ? "" : "none";
   });
 
+  function applyPrefilledSettings() {
+    const loopBox = document.getElementById("loop");
+    const shuffleBox = document.getElementById("shuffle");
+    const kumaToggle = document.getElementById("kumaToggle");
+    const heartbeatInput = document.getElementById("heartbeat");
+
+    loopBox.checked = parseBooleanParam(qs("loop"), loopBox.checked);
+    shuffleBox.checked = parseBooleanParam(qs("shuffle"), shuffleBox.checked);
+
+    const heartbeat = qs("heartbeat");
+    if (heartbeat !== null) {
+      heartbeatInput.value = heartbeat;
+      kumaToggle.checked = heartbeat.trim() !== "";
+    } else {
+      kumaToggle.checked = false;
+    }
+
+    loopBox.dispatchEvent(new Event("change"));
+    kumaToggle.dispatchEvent(new Event("change"));
+  }
+
   const out = document.getElementById("out");
   const copyBtn = document.getElementById("copy");
+
+  applyPrefilledSettings();
 
   document.getElementById("gen").addEventListener("click", () => {
     const playlistId = getPlaylistId(document.getElementById("url").value);

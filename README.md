@@ -22,6 +22,12 @@ A self-hosted, always-on YouTube playlist player designed for unattended 24/7 pl
 4. Click **Generate** to get a player URL
 5. Open the player URL in a browser — it will play continuously (it is recommended to be logged into a YouTube account with an active YouTube Premium subsription, and ensure any browser protections for cross-site cookie usage are disabled on the page)
 
+You can also pre-configure the generator itself via query parameters. This is useful when embedding the generator in another site or control panel.
+
+Example:
+
+`https://louis.au/yt-player/?loop=yes&shuffle=no&heartbeat=https%3A%2F%2Fkuma.example.com%2Fapi%2Fpush%2Fabc`
+
 ## How It Works
 
 - **`index.html`** — URL generator UI. Extracts the playlist ID from a YouTube URL and builds a `player.html` link with the selected options as query parameters.
@@ -35,3 +41,13 @@ A self-hosted, always-on YouTube playlist player designed for unattended 24/7 pl
 | `loop`      | Loop playlist (`1` or `0`)           | `1`     |
 | `shuffle`   | Shuffle on each loop (`1` or `0`)    | `0`     |
 | `heartbeat` | Uptime Kuma push URL                 | —       |
+
+## Query Parameters (index.html)
+
+The generator page accepts query parameters to pre-fill its form state before the user clicks **Generate**.
+
+| Parameter   | Description                                              | Accepted values |
+|-------------|----------------------------------------------------------|-----------------|
+| `loop`      | Pre-check or clear the loop option                       | `yes/no`, `true/false`, `1/0`, `on/off` |
+| `shuffle`   | Pre-check or clear the shuffle option                    | `yes/no`, `true/false`, `1/0`, `on/off` |
+| `heartbeat` | Pre-fill the Uptime Kuma heartbeat URL and tick the option when non-empty | Any URL-encoded string |
