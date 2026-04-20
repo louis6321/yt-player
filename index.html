@@ -141,7 +141,7 @@
     </div>
 
     <div id="kumaField" style="display:none; margin-bottom:16px;">
-      <label for="heartbeat">Heartbeat URL</label>
+      <label for="heartbeat" id="heartbeatLabel">Heartbeat URL</label>
       <input type="text" id="heartbeat" placeholder="https://kuma.example.com/api/push/..." spellcheck="false" />
     </div>
 
@@ -222,6 +222,7 @@
     const shuffleBox = document.getElementById("shuffle");
     const kumaToggle = document.getElementById("kumaToggle");
     const heartbeatInput = document.getElementById("heartbeat");
+    const heartbeatLabel = document.getElementById("heartbeatLabel");
 
     loopBox.checked = parseBooleanParam(qs("loop"), loopBox.checked);
     shuffleBox.checked = parseBooleanParam(qs("shuffle"), shuffleBox.checked);
@@ -230,8 +231,12 @@
     if (heartbeat !== null) {
       heartbeatInput.value = heartbeat;
       kumaToggle.checked = heartbeat.trim() !== "";
+      heartbeatLabel.textContent = heartbeat.trim() !== ""
+        ? "Heartbeat URL (talk to Louis before changing this)"
+        : "Heartbeat URL";
     } else {
       kumaToggle.checked = false;
+      heartbeatLabel.textContent = "Heartbeat URL";
     }
 
     loopBox.dispatchEvent(new Event("change"));
