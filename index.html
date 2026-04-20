@@ -160,7 +160,7 @@
     </div>
 
     <div id="kumaField" style="display:none; margin-bottom:16px;">
-      <label for="heartbeat">Heartbeat URL <span id="heartbeatHintPrefix"></span><button type="button" id="heartbeatUnlock" class="inline-link-button" style="display:none;">unlock</button><span id="heartbeatHintSuffix"></span></label>
+      <label for="heartbeat" style="display:flex; justify-content:space-between; align-items:baseline;"><span>Heartbeat URL <span id="heartbeatHintPrefix"></span></span><button type="button" id="heartbeatUnlock" class="inline-link-button" style="display:none;">unlock</button></label>
       <input type="text" id="heartbeat" placeholder="https://kuma.example.com/api/push/..." spellcheck="false" />
     </div>
 
@@ -243,15 +243,11 @@
     const heartbeatInput = document.getElementById("heartbeat");
     const heartbeatHintPrefix = document.getElementById("heartbeatHintPrefix");
     const heartbeatUnlock = document.getElementById("heartbeatUnlock");
-    const heartbeatHintSuffix = document.getElementById("heartbeatHintSuffix");
 
     function setHeartbeatLocked(locked) {
       heartbeatInput.readOnly = locked;
-      heartbeatHintPrefix.textContent = locked
-        ? "(talk to Louis before changing this - "
-        : "(talk to Louis before changing this)";
+      if (locked) heartbeatHintPrefix.textContent = "(talk to Louis before changing this)";
       heartbeatUnlock.style.display = locked ? "inline" : "none";
-      heartbeatHintSuffix.textContent = locked ? ")" : "";
     }
 
     loopBox.checked = parseBooleanParam(qs("loop"), loopBox.checked);
@@ -272,7 +268,6 @@
 
     heartbeatUnlock.addEventListener("click", () => {
       setHeartbeatLocked(false);
-      heartbeatInput.focus();
     });
   }
 
