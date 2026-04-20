@@ -247,7 +247,9 @@
 
     function setHeartbeatLocked(locked) {
       heartbeatInput.readOnly = locked;
-      heartbeatHintPrefix.textContent = locked ? "(talk to Louis before changing this - " : "";
+      heartbeatHintPrefix.textContent = locked
+        ? "(talk to Louis before changing this - "
+        : "(talk to Louis before changing this)";
       heartbeatUnlock.style.display = locked ? "inline" : "none";
       heartbeatHintSuffix.textContent = locked ? ")" : "";
     }
