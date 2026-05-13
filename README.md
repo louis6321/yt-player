@@ -28,6 +28,12 @@ Example:
 
 `https://louis.au/yt-player/?loop=yes&shuffle=no&heartbeat=https%3A%2F%2Fkuma.example.com%2Fapi%2Fpush%2Fabc`
 
+If you embed the generator in an iframe, allow clipboard access so the copy button can use the browser Clipboard API:
+
+```html
+<iframe src="https://louis.au/yt-player/" allow="clipboard-write"></iframe>
+```
+
 ## How It Works
 
 - **`index.html`** — URL generator UI. Extracts the playlist ID from a YouTube URL and builds a `player.html` link with the selected options as query parameters.

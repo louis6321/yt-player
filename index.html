@@ -273,6 +273,7 @@
 
   const out = document.getElementById("out");
   const copyBtn = document.getElementById("copy");
+  let copyResetTimer = null;
 
   applyPrefilledSettings();
 
@@ -294,11 +295,80 @@
     if (e.key === "Enter") document.getElementById("gen").click();
   });
 
+  function resetCopyButton(label, timeout = 1200) {
+    clearTimeout(copyResetTimer);
+    copyBtn.textContent = label;
+    copyResetTimer = setTimeout(() => {
+      copyBtn.textContent = "Copy";
+    }, timeout);
+  }
+
+  function fallbackCopyText(text) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.readOnly = true;
+    textarea.style.position = "fixed";
+    textarea.style.top = "0";
+    textarea.style.left = "-9999px";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+
+    const selection = window.getSelection();
+    const previousRange = selection && selection.rangeCount ? selection.getRangeAt(0) : null;
+
+    textarea.focus();
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+
+    let copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch {
+      copied = false;
+    }
+
+    textarea.remove();
+
+    if (selection) {
+      selection.removeAllRanges();
+      if (previousRange) selection.addRange(previousRange);
+    }
+
+    return copied;
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {
+        // Some iframe hosts block the async Clipboard API unless clipboard-write is allowed.
+      }
+    }
+
+    return fallbackCopyText(text);
+  }
+
+  function selectOutputText() {
+    const selection = window.getSelection();
+    if (!selection) return;
+
+    const range = document.createRange();
+    range.selectNodeContents(out);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
   copyBtn.addEventListener("click", async () => {
     const text = out.textContent.trim();
-    await navigator.clipboard.writeText(text);
-    copyBtn.textContent = "Copied";
-    setTimeout(() => (copyBtn.textContent = "Copy"), 1200);
+    if (await copyText(text)) {
+      resetCopyButton("Copied");
+      return;
+    }
+
+    selectOutputText();
+    resetCopyButton("Selected", 1800);
   });
 </script>
 </body>
