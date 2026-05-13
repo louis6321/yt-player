@@ -144,6 +144,47 @@
       min-height: 40px;
     }
     .output-box.has-url { color: #d4d4d4; }
+
+    .warning-modal[hidden] {
+      display: none;
+    }
+    .warning-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(0, 0, 0, 0.72);
+    }
+    .warning-panel {
+      width: min(420px, 100%);
+      padding: 20px;
+      background: #111113;
+      border: 1px solid #2b2b2f;
+      border-radius: 6px;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+    }
+    .warning-message {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #dedede;
+      margin-bottom: 18px;
+    }
+    .warning-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .warning-proceed {
+      border-color: #654040;
+      color: #e4b7b7;
+    }
+    .warning-proceed:hover {
+      background: #241819;
+      border-color: #7a4b4b;
+    }
   </style>
 </head>
 <body>
@@ -175,13 +216,23 @@
     </div>
   </div>
 
+  <div class="warning-modal" id="heartbeatWarningModal" role="dialog" aria-modal="true" aria-labelledby="heartbeatWarningMessage" hidden>
+    <div class="warning-panel">
+      <p class="warning-message" id="heartbeatWarningMessage">You should talk to Louis before turning off heartbeats!</p>
+      <div class="warning-actions">
+        <button type="button" id="heartbeatWarningCancel">Cancel</button>
+        <button type="button" class="warning-proceed" id="heartbeatWarningProceed">Proceed Anyway</button>
+      </div>
+    </div>
+  </div>
+
 <script>
   function qs(name) {
     return new URLSearchParams(window.location.search).get(name);
   }
 
-  const HEARTBEAT_DISABLE_WARNING = "You should talk to Louis before turning off heartbeats!";
   let heartbeatPrefilled = false;
+  let heartbeatWarningReturnFocus = null;
 
   function parseBooleanParam(value, fallback) {
     if (value === null) return fallback;
@@ -235,12 +286,55 @@
     shuffleBox.disabled = !e.target.checked;
   });
 
+  function setKumaFieldVisible(visible) {
+    document.getElementById("kumaField").style.display = visible ? "" : "none";
+  }
+
+  function closeHeartbeatWarningModal() {
+    document.getElementById("heartbeatWarningModal").hidden = true;
+    if (heartbeatWarningReturnFocus) heartbeatWarningReturnFocus.focus();
+    heartbeatWarningReturnFocus = null;
+  }
+
+  function showHeartbeatWarningModal() {
+    const modal = document.getElementById("heartbeatWarningModal");
+    if (!modal.hidden) return;
+
+    heartbeatWarningReturnFocus = document.activeElement;
+    modal.hidden = false;
+    document.getElementById("heartbeatWarningCancel").focus();
+  }
+
   document.getElementById("kumaToggle").addEventListener("change", (e) => {
     if (heartbeatPrefilled && !e.target.checked && e.isTrusted !== false) {
-      alert(HEARTBEAT_DISABLE_WARNING);
+      e.target.checked = true;
+      setKumaFieldVisible(true);
+      showHeartbeatWarningModal();
+      return;
     }
 
-    document.getElementById("kumaField").style.display = e.target.checked ? "" : "none";
+    setKumaFieldVisible(e.target.checked);
+  });
+
+  document.getElementById("heartbeatWarningCancel").addEventListener("click", () => {
+    closeHeartbeatWarningModal();
+  });
+
+  document.getElementById("heartbeatWarningProceed").addEventListener("click", () => {
+    closeHeartbeatWarningModal();
+    document.getElementById("kumaToggle").checked = false;
+    setKumaFieldVisible(false);
+    document.getElementById("kumaToggle").focus();
+  });
+
+  document.getElementById("heartbeatWarningModal").addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) closeHeartbeatWarningModal();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !document.getElementById("heartbeatWarningModal").hidden) {
+      closeHeartbeatWarningModal();
+    }
   });
 
   function applyPrefilledSettings() {
