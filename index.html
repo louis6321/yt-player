@@ -180,6 +180,9 @@
     return new URLSearchParams(window.location.search).get(name);
   }
 
+  const HEARTBEAT_DISABLE_WARNING = "You should talk to Louis before turning off heartbeats!";
+  let heartbeatPrefilled = false;
+
   function parseBooleanParam(value, fallback) {
     if (value === null) return fallback;
 
@@ -233,6 +236,10 @@
   });
 
   document.getElementById("kumaToggle").addEventListener("change", (e) => {
+    if (heartbeatPrefilled && !e.target.checked && e.isTrusted !== false) {
+      alert(HEARTBEAT_DISABLE_WARNING);
+    }
+
     document.getElementById("kumaField").style.display = e.target.checked ? "" : "none";
   });
 
@@ -255,10 +262,12 @@
 
     const heartbeat = qs("heartbeat");
     if (heartbeat !== null) {
+      heartbeatPrefilled = heartbeat.trim() !== "";
       heartbeatInput.value = heartbeat;
       kumaToggle.checked = heartbeat.trim() !== "";
       setHeartbeatLocked(heartbeat.trim() !== "");
     } else {
+      heartbeatPrefilled = false;
       kumaToggle.checked = false;
       setHeartbeatLocked(false);
     }
