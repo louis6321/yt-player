@@ -8,6 +8,7 @@ A self-hosted, always-on YouTube playlist player designed for unattended 24/7 pl
 
 - **Continuous playback** — automatically advances through a playlist and loops when finished
 - **Shuffle on loop** — optionally re-shuffle the playlist order each time it loops
+- **Skip endcards** — optionally advance before the final configured seconds of every video
 - **Resume on reload** — saves progress (video index and timestamp) to `localStorage` so playback resumes where it left off after a page refresh or crash
 - **Watchdog recovery** — detects buffering stalls, stuck playback, and unresponsive player states; automatically reloads to keep playback running
 - **Error skipping** — skips videos that can't be embedded (error 101/150) and continues with the next track
@@ -18,7 +19,7 @@ A self-hosted, always-on YouTube playlist player designed for unattended 24/7 pl
 
 1. Open the [generator page](https://louis.au/yt-player/)
 2. Paste a YouTube playlist URL
-3. Configure options (loop, shuffle, heartbeat)
+3. Configure options (loop, shuffle, endcard skipping, heartbeat)
 4. Click **Generate** to get a player URL
 5. Open the player URL in a browser — it will play continuously (it is recommended to be logged into a YouTube account with an active YouTube Premium subsription, and ensure any browser protections for cross-site cookie usage are disabled on the page)
 
@@ -46,6 +47,7 @@ If you embed the generator in an iframe, allow clipboard access so the copy butt
 | `list`      | YouTube playlist ID (required)       | —       |
 | `loop`      | Loop playlist (`1` or `0`)           | `1`     |
 | `shuffle`   | Shuffle on each loop (`1` or `0`)    | `0`     |
+| `skipEndcard` | Seconds to skip from each video's end | —       |
 | `heartbeat` | Uptime Kuma push URL                 | —       |
 
 ## Query Parameters (index.html)
@@ -56,4 +58,5 @@ The generator page accepts query parameters to pre-fill its form state before th
 |-------------|----------------------------------------------------------|-----------------|
 | `loop`      | Pre-check or clear the loop option                       | `yes/no`, `true/false`, `1/0`, `on/off` |
 | `shuffle`   | Pre-check or clear the shuffle option                    | `yes/no`, `true/false`, `1/0`, `on/off` |
+| `skipEndcard` | Pre-fill and enable endcard skipping                    | Any number greater than `0` |
 | `heartbeat` | Pre-fill the Uptime Kuma heartbeat URL and tick the option when non-empty | Any URL-encoded string |
